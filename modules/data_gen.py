@@ -2,32 +2,44 @@ from datetime import datetime
 from random import choice
 from typing import Any, ClassVar
 
-from attrs import define
+from attrs import define, field
 from dateutil.relativedelta import relativedelta
 from mimesis import Address, Datetime, Gender, Locale, Person
 
 
 @define
 class DataGenerator:
+    """Random data tables generation.
+
+    Available fake data:
+     Personal profiles leak base
+
+    Parameters:
+     ----------
+     rows: int
+         Number of rows in resulting table
+    """
+
+    rows: int = field()
+
+    @rows.validator
+    def check_range(self, attribute, value):
+        if value < 500_000 or value > 2_000_000:
+            raise ValueError(
+                'You must provide number between 500 thousands and 2 millions'
+            )
+
+    # while value not in range(500_000, 2_000_001):
+    #     value = int(input)
+
     GENDERS: ClassVar[list] = [i for i in Gender.__members__.values()]
     LOCALES: ClassVar[list] = [
         i.value for i in Locale.__members__.values() if i.value != 'et'
     ]
-    PERSON_COL_NAMES: list[str] = [
-        'full_name',
-        'country_code',
-        'gender',
-        'age',
-        'birth_date',
-        'address',
-        'phone_number',
-        'email',
-        'password',
-        'political_views',
-        'academic_degree',
-    ]
 
     def generate_person_profile(self) -> list:
+        """Generate single row with profile data."""
+
         locale = choice(self.LOCALES)
         birth_date: Any = Datetime().date(1950, 2005)
         age: int = relativedelta(datetime.now(), birth_date).years
@@ -48,14 +60,10 @@ class DataGenerator:
             person.password(),
             person.political_views(),
             person.academic_degree(),
+            person.blood_type(),
         ]
 
-    def generate_table(self, rows) -> list[list]:
-        while rows < 500_000 or rows > 2_000_000:
-            rows = int(
-                input('Please, provide number in range (500_000, 2_000_000): ')
-            )
-        return [self.generate_person_profile() for _ in range(rows)]
+    def generate_table(self) -> list[list]:
+        """Generate full table with provided rows number."""
 
-
-person = DataGenerator()
+        return [self.generate_person_profile() for _ in range(self.rows)]

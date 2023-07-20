@@ -1,39 +1,85 @@
-from typing import ClassVar
 import zipfile
 
 import py7zr
 from attrs import define, field
+from split_file_writer import SplitFileWriter
 
 
 @define
 class Archiver:
+    """Class to create archive files.
 
-    SUPPORTED_FORMATS: ClassVar[list[str]] = ['7z', 'zip']
-    archive_name: str
+    Available archive formats:
+     7z, zip
+
+    Parameters:
+     ----------
+     archive_type: str
+         Archive file format
+    """
+
     archive_type: str = field()
 
     @archive_type.validator
-    def check(self, attribute, value: str) -> None:
-        while value not in :
-            print(attribute)
-            value = input(f'Please, provide one of these formats: zip, 7z')
+    def check_if_supported(self, attribute, value: str) -> None:
+        if value not in self.SUPPORTED_FORMATS:
+            raise ValueError(
+                'You must provide one of these formats:'
+                f' {self.SUPPORTED_FORMATS}'
+            )
+            # print(attribute)
+            # value = input(
+            #     'Please, provide one of these formats:'
+            #     f' {self.SUPPORTED_FORMATS}'
+            # )
 
-    def archive_file_zip(self, file_path: str) -> None:
-        with zipfile.ZipFile(
-            f'archived_data/{self.archive_name}.zip', mode='w'
-        ) as archive:
+    SUPPORTED_FORMATS: list[str] = ['7z', 'zip']
+
+    def archive_file_zip(
+        self, arch_name: str | SplitFileWriter, file_path: str
+    ) -> None:
+        """Create ZIP archive."""
+
+        name = (
+            arch_name
+            if type(arch_name) == SplitFileWriter
+            else f'archived_data/{arch_name}.zip'
+        )
+        with zipfile.ZipFile(name, mode='w') as archive:
             archive.write(file_path)
 
-    def archive_file_7z(self, file_path: str) -> None:
-        with py7zr.SevenZipFile(
-            'archived_data/{self.archive_name}.7z', 'w'
-        ) as archive:
+    def archive_file_7z(
+        self, arch_name: str | SplitFileWriter, file_path: str
+    ) -> None:
+        """Create 7Z archive."""
+
+        name = (
+            arch_name
+            if type(arch_name) == SplitFileWriter
+            else f'archived_data/{arch_name}.7z'
+        )
+        with py7zr.SevenZipFile(name, 'w') as archive:
             archive.write(file_path)
 
-    ARCH_TYPES: dict = {
-        'zip': archive_file_zip,
-        '7z': archive_file_7z,
-    }
+    def archive_file_split(
+        self, arch_name: str, file_path: str, max_file_size: int
+    ) -> None:
+        """Create splitted archive."""
+
+        arch_types: dict = {
+            'zip': self.archive_file_zip,
+            '7z': self.archive_file_7z,
+        }
+        with SplitFileWriter(
+            f'archived_data/{arch_name}.zip.', max_file_size
+        ) as sfw:
+            arch_types[self.archive_type](sfw, file_path)
 
     def archive_data(self, file_path: str) -> None:
-        self.archive_file_zip(file_path)
+        """Create archive file with provided format and data."""
+
+        arch_types: dict = {
+            'zip': self.archive_file_zip,
+            '7z': self.archive_file_7z,
+        }
+        arch_types[self.archive_type](file_path)

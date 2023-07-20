@@ -9,14 +9,14 @@ def data_resolver() -> list[list] | str:
         True if input('Do you want to generate data? (y/n)') == 'y' else False
     )
     if should_generate:
-        data_gen = DataGenerator()
         rows = int(
             input(
                 'How many rows do you want to generate? (in range(500000,'
                 ' 2000000))'
             )
         )
-        return data_gen.generate_table(rows)
+        data_gen = DataGenerator(rows)
+        return data_gen.generate_table()
     return input('Type text')
 
 
