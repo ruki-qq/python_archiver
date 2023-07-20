@@ -1,3 +1,4 @@
+from typing import ClassVar
 import zipfile
 
 import py7zr
@@ -6,14 +7,16 @@ from attrs import define, field
 
 @define
 class Archiver:
+
+    SUPPORTED_FORMATS: ClassVar[list[str]] = ['7z', 'zip']
     archive_name: str
     archive_type: str = field()
 
     @archive_type.validator
     def check(self, attribute, value: str) -> None:
-        while value not in ['7z', 'zip']:
+        while value not in :
             print(attribute)
-            value = input('Please, provide one of these formats: zip, 7z')
+            value = input(f'Please, provide one of these formats: zip, 7z')
 
     def archive_file_zip(self, file_path: str) -> None:
         with zipfile.ZipFile(
