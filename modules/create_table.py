@@ -1,7 +1,11 @@
 import csv
 
-import xlsxwriter
+import _csv
 from attrs import define
+from progress.bar import IncrementalBar
+from rich import print
+from xlsxwriter.workbook import Workbook
+from xlsxwriter.worksheet import Worksheet
 
 
 @define
@@ -16,34 +20,58 @@ class TableData:
      file_name: str
          Name to create table file
      data: list[list]
-         Content of table file being created
+         Content of table file
     """
 
     file_name: str
     data: list[list]
 
-    def write_data_csv(self) -> None:
+    def write_data_csv(self) -> str:
         """Write data to csv file."""
 
         with open(f'{self.file_name}.csv', mode='w') as csv_file:
-            csv_writer = csv.writer(
+            csv_writer: _csv._writer = csv.writer(
                 csv_file,
                 delimiter=',',
                 quotechar='"',
                 quoting=csv.QUOTE_NONNUMERIC,
             )
-            for row in self.data:
-                csv_writer.writerow(row)
+            with IncrementalBar(
+                'Creating file', max=len(self.data), suffix='%(elapsed)d s.'
+            ) as bar:
+                for row in self.data:
+                    csv_writer.writerow(row)
+                    bar.next()
 
-    def write_data_xlxs(self) -> None:
+        print(f'File created: {self.file_name}.csv')
+        return f'{self.file_name}.csv'
+
+    def write_data_xlsx(self) -> str:
         """Write data to xlsx file."""
 
-        workbook = xlsxwriter.Workbook(f'{self.file_name}.xlsx')
-        worksheet = workbook.add_worksheet()
-
-        row = 0
-        for line in self.data:
-            worksheet.write_row(row, 0, line)
-            row += 1
-
+        workbook: Workbook = Workbook(f'{self.file_name}.xlsx')
+        worksheet: Worksheet = workbook.add_worksheet()
+        row: int = 0
+        with IncrementalBar(
+            'Creating file', max=len(self.data), suffix='%(elapsed)d s.'
+        ) as bar:
+            if len(self.data) > 1_048_576:
+                for line in self.data[:1_048_576]:
+                    worksheet.write_row(row, 0, line)
+                    row += 1
+                    bar.next()
+                worksheet = workbook.add_worksheet()
+                row = 0
+                for line in self.data[1_048_576:]:
+                    worksheet.write_row(row, 0, line)
+                    row += 1
+                    bar.next()
+            else:
+                for line in self.data:
+                    worksheet.write_row(row, 0, line)
+                    row += 1
+                    bar.next()
         workbook.close()
+
+        print(f'File created: {self.file_name}.xlsx')
+        return f'{self.file_name}.xlsx'

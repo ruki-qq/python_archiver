@@ -4,6 +4,8 @@ import py7zr
 from attrs import define, field
 from split_file_writer import SplitFileWriter
 
+SUPPORTED_FORMATS: list[str] = ['7z', 'zip']
+
 
 @define
 class Archiver:
@@ -22,18 +24,15 @@ class Archiver:
 
     @archive_type.validator
     def check_if_supported(self, attribute, value: str) -> None:
-        if value not in self.SUPPORTED_FORMATS:
+        if value not in SUPPORTED_FORMATS:
             raise ValueError(
-                'You must provide one of these formats:'
-                f' {self.SUPPORTED_FORMATS}'
+                f'You must provide one of these formats: {SUPPORTED_FORMATS}'
             )
             # print(attribute)
             # value = input(
             #     'Please, provide one of these formats:'
             #     f' {self.SUPPORTED_FORMATS}'
             # )
-
-    SUPPORTED_FORMATS: list[str] = ['7z', 'zip']
 
     def archive_file_zip(
         self, arch_name: str | SplitFileWriter, file_path: str
@@ -75,7 +74,7 @@ class Archiver:
         ) as sfw:
             arch_types[self.archive_type](sfw, file_path)
 
-    def archive_data(self, file_path: str) -> None:
+    def archive_data(self, arch_name: str, file_path: str) -> None:
         """Create archive file with provided format and data."""
 
         arch_types: dict = {

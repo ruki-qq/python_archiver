@@ -5,6 +5,7 @@ from typing import Any, ClassVar
 from attrs import define, field
 from dateutil.relativedelta import relativedelta
 from mimesis import Address, Datetime, Gender, Locale, Person
+from progress.bar import IncrementalBar
 
 
 @define
@@ -22,15 +23,12 @@ class DataGenerator:
 
     rows: int = field()
 
-    @rows.validator
-    def check_range(self, attribute, value):
-        if value < 500_000 or value > 2_000_000:
-            raise ValueError(
-                'You must provide number between 500 thousands and 2 millions'
-            )
-
-    # while value not in range(500_000, 2_000_001):
-    #     value = int(input)
+    # @rows.validator
+    # def check_range(self, attribute, value):
+    #     if value < 500_000 or value > 2_000_000:
+    #         raise ValueError(
+    #             'You must provide number between 500 thousands and 2 millions'
+    #         )
 
     GENDERS: ClassVar[list] = [i for i in Gender.__members__.values()]
     LOCALES: ClassVar[list] = [
@@ -66,4 +64,11 @@ class DataGenerator:
     def generate_table(self) -> list[list]:
         """Generate full table with provided rows number."""
 
-        return [self.generate_person_profile() for _ in range(self.rows)]
+        result: list[list] = []
+        with IncrementalBar(
+            'Generating', max=self.rows, suffix='%(elapsed)d s.'
+        ) as bar:
+            for _ in range(self.rows):
+                result.append(self.generate_person_profile())
+                bar.next()
+        return result
