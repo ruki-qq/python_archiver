@@ -1,5 +1,6 @@
 import logging
 from pathlib import Path
+from typing import Callable
 
 import typer
 from rich import print
@@ -31,18 +32,18 @@ def data_generation() -> str:
 
     data_gen: DataGenerator = DataGenerator(rows)
     logging.info('Starting generation process')
-    data: list[list] = data_gen.generate_table()
+    data: list[list[str | int]] = data_gen.generate_table()
     return data_saver(data)
 
 
-def data_saver(data: list[list]) -> str:
+def data_saver(data: list[list[str | int]]) -> str:
     """Save data to table file and return it's path."""
     logging.info('Saving generated data to table file')
     file_name: str = input('Type file name for table: ')
     file_format: str = Prompt.ask(
         'Type table file format', choices=['csv', 'xlsx'], default='csv'
     )
-    table = TableData(file_name, file_format, data)
+    table: TableData = TableData(file_name, file_format, data)
     logging.info(
         f'Starting file creation at {FILE_FOLDER}{file_name}.{file_format}'
     )
@@ -76,7 +77,7 @@ def data_typing() -> str:
 def data_resolver() -> str:
     """Resolve data file and return path to file."""
     logging.info('Asking user for data to archive')
-    actions: dict = {
+    actions: dict[str, Callable] = {
         'generate data': data_generation,
         'specify path': data_path,
         'type text': data_typing,
@@ -112,7 +113,7 @@ def data_archiver(file_path: str) -> None:
         )
         arch.archive_data(arch_name, file_path, must_split, max_file_size)
         logging.info(
-            f'Archive created: {ARCH_FOLDER}{arch_name}.{arch_type}[PARTS]'
+            f'Archive with parts created: {ARCH_FOLDER}{arch_name}.{arch_type}'
         )
     else:
         logging.info(f'Starting archiving data into {arch_type} archive')

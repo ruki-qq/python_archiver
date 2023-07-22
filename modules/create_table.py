@@ -1,6 +1,8 @@
 import csv
+from typing import Callable
 
 import _csv
+from attr._make import Attribute
 from attrs import define, field
 from progress.bar import IncrementalBar
 from rich import print
@@ -22,16 +24,18 @@ class TableData:
      ----------
      file_name: str
          Name to create table file
-     data: list[list]
+     file_format: str
+         Format of table file
+     data: list[list[str | int]]
          Content of table file
     """
 
     file_name: str
     file_format: str = field()
-    data: list[list]
+    data: list[list[str | int]]
 
     @file_format.validator
-    def check_if_supported(self, attribute, value: str) -> None:
+    def check_if_supported(self, attribute: Attribute, value: str) -> None:
         if value not in SUPPORTED_TABLE_FILE_FORMATS:
             raise ValueError(
                 'You must provide one of these formats:'
@@ -61,7 +65,7 @@ class TableData:
     def write_data_xlsx(self) -> str:
         """Write data to xlsx file."""
 
-        max_sheet_rows = 1_048_576
+        max_sheet_rows: int = 1_048_576
         workbook: Workbook = Workbook(f'{FILE_FOLDER}{self.file_name}.xlsx')
         num_sheets: int = (
             len(self.data) + max_sheet_rows - 1
@@ -87,7 +91,7 @@ class TableData:
     def write_data(self) -> str:
         """Create table file with provided format and data."""
 
-        arch_types: dict = {
+        arch_types: dict[str, Callable] = {
             'csv': self.write_data_csv,
             'xlsx': self.write_data_xlsx,
         }

@@ -1,3 +1,4 @@
+from attr._make import Attribute
 from attrs import define, field
 from mimesis import Person
 from progress.bar import IncrementalBar
@@ -19,16 +20,16 @@ class DataGenerator:
     rows: int = field()
 
     @rows.validator
-    def check_range(self, attribute, value):
+    def check_range(self, attribute: Attribute, value: int):
         if value < 500_000 or value > 2_000_000:
             raise ValueError(
                 'You must provide number between 500 thousands and 2 millions'
             )
 
-    def generate_person_profile(self) -> list:
+    def generate_person_profile(self) -> list[str | int]:
         """Generate single row with profile data."""
 
-        person = Person()
+        person: Person = Person()
 
         return [
             person.full_name(),
@@ -44,10 +45,10 @@ class DataGenerator:
             person.blood_type(),
         ]
 
-    def generate_table(self) -> list[list]:
+    def generate_table(self) -> list[list[str | int]]:
         """Generate full table with provided rows number."""
 
-        result: list[list] = []
+        result: list[list[str | int]] = []
         with IncrementalBar(
             'Generating', max=self.rows, suffix='%(elapsed)d s.'
         ) as bar:

@@ -3,8 +3,8 @@ from io import BytesIO
 from typing import Callable
 
 import py7zr
+from attr._make import Attribute
 from attrs import define, field
-from progress.bar import IncrementalBar
 from rich import print
 
 SUPPORTED_ARCH_FORMATS: list[str] = ['7z', 'zip']
@@ -27,7 +27,7 @@ class Archiver:
     archive_format: str = field()
 
     @archive_format.validator
-    def check_if_supported(self, attribute, value: str) -> None:
+    def check_if_supported(self, attribute: Attribute, value: str) -> None:
         if value not in SUPPORTED_ARCH_FORMATS:
             raise ValueError(
                 'You must provide one of these formats:'
@@ -72,25 +72,43 @@ class Archiver:
         buf: BytesIO = BytesIO()
 
         arch_method(buf, file_path)
+
         buf.seek(0)
         num_chunks: int = (
             buf.getbuffer().nbytes + chunk_size - 1
         ) // chunk_size
-        with IncrementalBar(
-            'Creating archive parts',
-            max=num_chunks,
-            suffix='%(elapsed)d s.',
-        ) as bar:
-            for chunk_idx in range(num_chunks):
-                start: int = chunk_idx * chunk_size
-                end: int = start + chunk_size
-                chunk_data: bytes = buf.getvalue()[start:end]
+
+        bufs_list: list[BytesIO] = []
+
+        for chunk_idx in range(num_chunks):
+            start: int = chunk_idx * chunk_size
+            end: int = start + chunk_size
+            chunk_data: bytes = buf.getvalue()[start:end]
+            bufs_list.append(BytesIO(chunk_data))
+
+        with BytesIO() as res_arch_buf:
+            if self.archive_format == 'zip':
+                with zipfile.ZipFile(res_arch_buf, 'w') as out_zip:
+                    for idx, chunk in enumerate(bufs_list):
+                        out_zip.writestr(
+                            f'{arch_name}.{self.archive_format}.{idx+1:03d}',
+                            chunk.getvalue(),
+                        )
                 with open(
-                    f'{ARCH_FOLDER}{arch_name}.{self.archive_format}.{chunk_idx+1:03d}',
-                    'wb',
-                ) as f:
-                    f.write(chunk_data)
-                bar.next()
+                    f'{ARCH_FOLDER}{arch_name}.{self.archive_format}', 'wb'
+                ) as output_file:
+                    output_file.write(res_arch_buf.getvalue())
+            elif self.archive_format == '7z':
+                with py7zr.SevenZipFile(res_arch_buf, 'w') as out_7z:
+                    for idx, chunk in enumerate(bufs_list):
+                        out_7z.writestr(
+                            chunk.getvalue(),
+                            f'{arch_name}.{self.archive_format}.{idx+1:03d}',
+                        )
+                with open(
+                    f'{ARCH_FOLDER}{arch_name}.{self.archive_format}', 'wb'
+                ) as output_file:
+                    output_file.write(res_arch_buf.getvalue())
 
     def archive_data(
         self,
@@ -101,7 +119,7 @@ class Archiver:
     ) -> None:
         """Create archive file with provided format and data."""
 
-        arch_formats: dict = {
+        arch_formats: dict[str, Callable] = {
             'zip': self.archive_file_zip,
             '7z': self.archive_file_7z,
         }
@@ -114,8 +132,8 @@ class Archiver:
                 max_file_size,
             )
             print(
-                'Archive created:'
-                f' {ARCH_FOLDER}{arch_name}.{self.archive_format}[PARTS]'
+                'Archive with parts created:'
+                f' {ARCH_FOLDER}{arch_name}.{self.archive_format}'
             )
         else:
             print(f'Creating {self.archive_format} archive')
