@@ -1,10 +1,5 @@
-from datetime import datetime
-from random import choice
-from typing import Any, ClassVar
-
 from attrs import define, field
-from dateutil.relativedelta import relativedelta
-from mimesis import Address, Datetime, Gender, Locale, Person
+from mimesis import Person
 from progress.bar import IncrementalBar
 
 
@@ -23,36 +18,24 @@ class DataGenerator:
 
     rows: int = field()
 
-    # @rows.validator
-    # def check_range(self, attribute, value):
-    #     if value < 500_000 or value > 2_000_000:
-    #         raise ValueError(
-    #             'You must provide number between 500 thousands and 2 millions'
-    #         )
-
-    GENDERS: ClassVar[list] = [i for i in Gender.__members__.values()]
-    LOCALES: ClassVar[list] = [
-        i.value for i in Locale.__members__.values() if i.value != 'et'
-    ]
+    @rows.validator
+    def check_range(self, attribute, value):
+        if value < 500_000 or value > 2_000_000:
+            raise ValueError(
+                'You must provide number between 500 thousands and 2 millions'
+            )
 
     def generate_person_profile(self) -> list:
         """Generate single row with profile data."""
 
-        locale = choice(self.LOCALES)
-        birth_date: Any = Datetime().date(1950, 2005)
-        age: int = relativedelta(datetime.now(), birth_date).years
-        birth_date = birth_date.strftime('%m/%d/%Y')
-        person = Person(locale)
-        address: str = Address(locale).address()
-        gender = choice(self.GENDERS)
+        person = Person()
 
         return [
-            person.full_name(gender),
-            locale,
-            gender.value,
-            age,
-            birth_date,
-            address,
+            person.full_name(),
+            person.height(),
+            person.gender(),
+            person.age(),
+            person.language(),
             person.phone_number(),
             person.email(),
             person.password(),
