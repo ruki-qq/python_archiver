@@ -3,6 +3,8 @@ from attrs import define, field
 from mimesis import Person
 from progress.bar import IncrementalBar
 
+from modules.constants import MAX_GEN_ROWS, MIN_GEN_ROWS
+
 
 @define
 class DataGenerator:
@@ -21,12 +23,13 @@ class DataGenerator:
 
     @rows.validator
     def check_range(self, attribute: Attribute, value: int):
-        if value < 500_000 or value > 2_000_000:
+        if MAX_GEN_ROWS < value < MIN_GEN_ROWS:
             raise ValueError(
-                'You must provide number between 500 thousands and 2 millions'
+                f'You must provide number between {MIN_GEN_ROWS:,} and {MAX_GEN_ROWS:,}'
             )
 
-    def generate_person_profile(self) -> list[str | int]:
+    @staticmethod
+    def generate_person_profile() -> list[str | int]:
         """Generate single row with profile data."""
 
         person: Person = Person()
@@ -50,7 +53,7 @@ class DataGenerator:
 
         result: list[list[str | int]] = []
         with IncrementalBar(
-            'Generating', max=self.rows, suffix='%(elapsed)d s.'
+                'Generating', max=self.rows, suffix='%(elapsed)d s.'
         ) as bar:
             for _ in range(self.rows):
                 result.append(self.generate_person_profile())

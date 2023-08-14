@@ -1,13 +1,12 @@
-import zipfile
 from io import BytesIO
 from typing import Callable
+from zipfile import ZipFile
 
-import py7zr
 from attr._make import Attribute
 from attrs import define, field
-from rich import print
+from py7zr import SevenZipFile
 
-SUPPORTED_ARCH_FORMATS: list[str] = ['7z', 'zip']
+SUPPORTED_ARCH_FORMATS: dict[str] = {'7z': SevenZipFile, 'zip': ZipFile}
 ARCH_FOLDER: str = 'archived_data/'
 
 
@@ -15,8 +14,8 @@ ARCH_FOLDER: str = 'archived_data/'
 class Archiver:
     """Class to create archive files.
 
-    Available archive formats:
-     7z, zip
+    Available table file formats can be looked up in
+      SUPPORTED_ARCH_FORMATS constant.
 
     Parameters:
      ----------
@@ -24,7 +23,9 @@ class Archiver:
          Archive file format
     """
 
+    arch_name: str
     archive_format: str = field()
+    file_path: str
 
     @archive_format.validator
     def check_if_supported(self, attribute: Attribute, value: str) -> None:
@@ -34,49 +35,31 @@ class Archiver:
                 f' {SUPPORTED_ARCH_FORMATS}'
             )
 
-    def archive_file_zip(
-        self, arch_name: str | BytesIO, file_path: str
-    ) -> None:
-        """Create ZIP archive."""
+    def archive_file(self, buf_name: BytesIO = None) -> None:
+        """Create archive file."""
+
+        arch_file: Callable = SUPPORTED_ARCH_FORMATS[self.archive_format]
 
         name: str | BytesIO = (
-            arch_name
-            if type(arch_name) == BytesIO
-            else f'{ARCH_FOLDER}{arch_name}.{self.archive_format}'
+            buf_name
+            if buf_name
+            else f'{ARCH_FOLDER}{self.arch_name}.{self.archive_format}'
         )
-        with zipfile.ZipFile(name, 'w') as archive:
-            archive.write(file_path)
-
-    def archive_file_7z(
-        self, arch_name: str | BytesIO, file_path: str
-    ) -> None:
-        """Create 7Z archive."""
-
-        name = (
-            arch_name
-            if type(arch_name) == BytesIO
-            else f'{ARCH_FOLDER}{arch_name}.{self.archive_format}'
-        )
-        with py7zr.SevenZipFile(name, 'w') as archive:
-            archive.write(file_path)
+        with arch_file(name, 'w') as archive:
+            archive.write(self.file_path)
 
     def archive_file_split(
-        self,
-        arch_name: str,
-        arch_method: Callable,
-        file_path: str,
-        chunk_size: int,
+            self,
+            chunk_size: int,
     ) -> None:
-        """Create splitted archive."""
+        """Create split archive."""
 
         buf: BytesIO = BytesIO()
 
-        arch_method(buf, file_path)
+        self.archive_file(buf)
 
         buf.seek(0)
-        num_chunks: int = (
-            buf.getbuffer().nbytes + chunk_size - 1
-        ) // chunk_size
+        num_chunks: int = (buf.getbuffer().nbytes + chunk_size - 1) // chunk_size
 
         bufs_list: list[BytesIO] = []
 
@@ -86,59 +69,83 @@ class Archiver:
             chunk_data: bytes = buf.getvalue()[start:end]
             bufs_list.append(BytesIO(chunk_data))
 
-        with BytesIO() as res_arch_buf:
-            if self.archive_format == 'zip':
-                with zipfile.ZipFile(res_arch_buf, 'w') as out_zip:
-                    for idx, chunk in enumerate(bufs_list):
-                        out_zip.writestr(
-                            f'{arch_name}.{self.archive_format}.{idx+1:03d}',
-                            chunk.getvalue(),
-                        )
-                with open(
-                    f'{ARCH_FOLDER}{arch_name}.{self.archive_format}', 'wb'
-                ) as output_file:
-                    output_file.write(res_arch_buf.getvalue())
-            elif self.archive_format == '7z':
-                with py7zr.SevenZipFile(res_arch_buf, 'w') as out_7z:
-                    for idx, chunk in enumerate(bufs_list):
-                        out_7z.writestr(
-                            chunk.getvalue(),
-                            f'{arch_name}.{self.archive_format}.{idx+1:03d}',
-                        )
-                with open(
-                    f'{ARCH_FOLDER}{arch_name}.{self.archive_format}', 'wb'
-                ) as output_file:
-                    output_file.write(res_arch_buf.getvalue())
+        self.write_res_arch(bufs_list)
 
-    def archive_data(
-        self,
+    def write_res_arch(self, bufs_list: list[BytesIO]):
+        """Creates an archive with split archive in it."""
+
+        raise NotImplementedError('Method is not implemented.')
+
+
+@define
+class ArchiverZIP(Archiver):
+    """Class to create ZIP archives."""
+
+    def write_res_arch(self, bufs_list: list[BytesIO]) -> None:
+        """Create ZIP archive with parted archive in it."""
+
+        arch_file: Callable = SUPPORTED_ARCH_FORMATS[self.archive_format]
+
+        with BytesIO() as res_arch_buf:
+            with arch_file(res_arch_buf, 'w') as out_zip:
+                for idx, chunk in enumerate(bufs_list):
+                    out_zip.writestr(
+                        f'{self.arch_name}.{self.archive_format}.{idx + 1:03d}',
+                        chunk.getvalue(),
+                    )
+            with open(
+                    f'{ARCH_FOLDER}{self.arch_name}.{self.archive_format}', 'wb'
+            ) as output_file:
+                output_file.write(res_arch_buf.getvalue())
+
+
+@define
+class Archiver7Z(Archiver):
+    """Class to create 7Z archives."""
+
+    def write_res_arch(self, bufs_list: list[BytesIO]) -> None:
+        """Create 7Z archive with parted archive in it."""
+
+        arch_file: Callable = SUPPORTED_ARCH_FORMATS[self.archive_format]
+
+        with BytesIO() as res_arch_buf:
+            with arch_file(res_arch_buf, 'w') as out_7z:
+                for idx, chunk in enumerate(bufs_list):
+                    out_7z.writestr(
+                        chunk.getvalue(),
+                        f'{self.arch_name}.{self.archive_format}.{idx + 1:03d}',
+                    )
+            with open(
+                    f'{ARCH_FOLDER}{self.arch_name}.{self.archive_format}', 'wb'
+            ) as output_file:
+                output_file.write(res_arch_buf.getvalue())
+
+
+def archive_data(
         arch_name: str,
+        arch_format: str,
         file_path: str,
         must_split: bool = False,
         max_file_size: int = 0,
-    ) -> None:
-        """Create archive file with provided format and data."""
+) -> None:
+    """Create archive file with provided format and data."""
 
-        arch_formats: dict[str, Callable] = {
-            'zip': self.archive_file_zip,
-            '7z': self.archive_file_7z,
-        }
-        if must_split:
-            print(f'Creating parted {self.archive_format} archive')
-            self.archive_file_split(
-                arch_name,
-                arch_formats[self.archive_format],
-                file_path,
-                max_file_size,
-            )
-            print(
-                'Archive with parts created:'
-                f' {ARCH_FOLDER}{arch_name}.{self.archive_format}'
-            )
-        else:
-            print(f'Creating {self.archive_format} archive')
-            arch_formats[self.archive_format](arch_name, file_path)
-            print(
-                'Archive created:'
-                f' {ARCH_FOLDER}{arch_name}.{self.archive_format}'
-            )
+    arch_formats: dict[str, Callable] = {
+        'zip': ArchiverZIP,
+        '7z': Archiver7Z,
+    }
+    arch: Archiver = arch_formats[arch_format](arch_name, arch_format, file_path)
+    if must_split:
+        print(f'Creating parted {arch_format} archive')
+        arch.archive_file_split(max_file_size)
+        print(
+            'Archive with parts created:'
+            f' {ARCH_FOLDER}{arch_name}.{arch_format}'
+        )
+    else:
+        print(f'Creating {arch_format} archive')
+        arch.archive_file()
+        print(
+            'Archive created:'
+            f' {ARCH_FOLDER}{arch_name}.{arch_format}'
+        )
